@@ -14,4 +14,4 @@ Column Feature :
 4. Prop Value: wiki data property value
 5. Prop Label: label of wiki data property
 6. Alias: the alias of wiki data property value
-7. Label : 0:inconsistent 1:consistent
+7. Label : 0:inconsistent, 1:consistent
