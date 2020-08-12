@@ -15,3 +15,6 @@ Column Feature :
 5. Prop Label: label of wiki data property
 6. Alias: the alias of wiki data property value
 7. Label : 0:inconsistent, 1:consistent
+
+# Code 
+bert_on_wiki_medicine.ipynb : I have written annotation in the code which can comprehend code.
