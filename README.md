@@ -1,9 +1,8 @@
 # wiki_project
 This repository is used to store wiki project code.
 # Data
-data link : https://drive.google.com/drive/folders/1MKGlhBfFh1kzVCZj_nssp459zMFZ_lW4?usp=sharing
-1. Medicine
-
+data link : https://drive.google.com/drive/folders/1MKGlhBfFh1kzVCZj_nssp459zMFZ_lW4?usp=sharing \\
+1. Medicine \\
 wiki_data.pickle : store medicine wiki article and wiki data
 
 2. Biology
