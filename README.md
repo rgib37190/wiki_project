@@ -12,9 +12,15 @@ wiki_data.pickle : store medicine wiki article and wiki data
 raw : store compressed file for english and chinese wiki article and wiki data
 
 preprocess:
-1.
-2.
-3.
-4.
+
+1. text_en.csv
+
+2. claim_en.csv
+
+3. text_zh.csv
+
+4. claim_zh.csv
+
 # Code 
-bert_on_wiki_medicine.ipynb : I have written annotation in the code which can comprehend code.
+
+
