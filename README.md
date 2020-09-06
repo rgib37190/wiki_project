@@ -13,13 +13,13 @@ raw : store compressed file for english and chinese wiki article and wiki data
 
 preprocess:
 
-1. text_en.csv
+1. text_en.csv : english wiki article
 
-2. claim_en.csv
+2. claim_en.csv : english wiki data
+ 
+3. text_zh.csv : chinese wiki article
 
-3. text_zh.csv
-
-4. claim_zh.csv
+4. claim_zh.csv : chinese wiki data
 
 # Code 
 
