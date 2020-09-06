@@ -1,4 +1,4 @@
-# wiki_project
+# Wikipedia-Wikidata Alignment
 This repository is used to store wiki project code.
 # Data
 data link : https://drive.google.com/drive/folders/1MKGlhBfFh1kzVCZj_nssp459zMFZ_lW4?usp=sharing
