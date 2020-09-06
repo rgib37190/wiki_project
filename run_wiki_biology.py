@@ -22,16 +22,19 @@ os.environ["CUDA_VISIBLE_DEVICES"]= "0"
 pd.options.display.max_rows = 100
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# load dataset
-with open('wikidata.pickle', 'rb') as f:
-    data = pickle.load(f)
-data['wikidata_as_text'] = data['wikidata_as_text'].apply(lambda x : str(x))
-data['value_label'] = data['value_label'].apply(lambda x : str(x))
-data = data.drop_duplicates(subset={'page_id','value_label'}).reset_index(drop=True)
-data = data.loc[data['wikidata_as_text']!='nan']
-data['plaintext'] = data['plaintext'].apply(lambda x : x.lower())
-data['wikidata_as_text'] = data['wikidata_as_text'].apply(lambda x : x.lower())
-data['value_label'] = data['value_label'].apply(lambda x : x.lower())
+en_text = pd.read_csv('text_en.csv')
+en_claim = pd.read_csv('claim_en.csv')
+en_total_data = en_claim.merge(en_text, on='Qid', how='left')
+en_total_data = en_total_data.dropna(subset=['value_label'])
+en_total_data['wikidata_as_text'] = en_total_data['page_title_x'] + ' ' + en_total_data['prop_label'] + ' ' + en_total_data['value_label']
+
+en_total_data['plain_text'] = en_total_data['plain_text'].apply(lambda x : x.lower())
+en_total_data['wikidata_as_text'] = en_total_data['wikidata_as_text'].apply(lambda x : x.lower())
+en_total_data['value_label'] = en_total_data['value_label'].apply(lambda x : x.lower().replace("\\",''))
+
+# select 100 article
+select_page_id = en_total_data['page_id'].unique()[:100]
+en_total_data = en_total_data.loc[en_total_data['page_id'].isin(select_page_id)]
 
 # load english model
 seq_len = 4096
@@ -46,14 +49,14 @@ all_article_change_value = []
 all_article_wikidata_text = []
 all_article_wikidata_text_length = []
 all_label_list = []
-for index, row in tqdm(data.iterrows(), total=len(data), desc='Preprocessing....'):
+for index, row in tqdm(en_total_data.iterrows(), total=len(en_total_data), desc='Preprocessing...'):
     page_id = row['page_id']
     if page_id not in page_id_record_list:
-        text = row['plaintext']
+        text = row['plain_text']
         spacy_text = nlp(text)
-        prop_values = data.loc[data['page_id']==page_id, 'value_label']
-        props = data.loc[data['page_id']==page_id, 'prop']
-        wikidata_texts = data.loc[data['page_id']==page_id, 'wikidata_as_text'].unique()
+        prop_values = en_total_data.loc[en_total_data['page_id']==page_id, 'value_label']
+        props = en_total_data.loc[en_total_data['page_id']==page_id, 'prop']
+        wikidata_texts = en_total_data.loc[en_total_data['page_id']==page_id, 'wikidata_as_text'].unique()
         
         start_index = 0
         article = []
@@ -69,7 +72,6 @@ for index, row in tqdm(data.iterrows(), total=len(data), desc='Preprocessing....
         segment_sentence = ''
         for sentence in spacy_text.sents:
             sentence = str(sentence).strip()
-            # concat sentence
             if segment_sentence_number < 4:
                 segment_sentence = segment_sentence + sentence
                 segment_sentence_number += 1
@@ -82,7 +84,7 @@ for index, row in tqdm(data.iterrows(), total=len(data), desc='Preprocessing....
                         match_result = re.search(pattern,segment_sentence)
                         if match_result:
                             select_wikidata_text.append(wikidata_text)
-                            disturb_choices = list(data.loc[data['prop']==prop, 'value_label'].unique())
+                            disturb_choices = list(en_total_data.loc[en_total_data['prop']==prop, 'value_label'].unique())
                             disturb_choices.remove(prop_value)
                             if len(disturb_choices) == 0:
                                 candidate_no_changed_sentence.append(segment_sentence)
@@ -91,7 +93,6 @@ for index, row in tqdm(data.iterrows(), total=len(data), desc='Preprocessing....
                                 disturb_sentence = segment_sentence.replace(prop_value, disturb_choice)
                                 candidate_changed_sentences.append(disturb_sentence)
                                 article_change_value.append(disturb_choice)
-                    # inconsistent
                     if len(candidate_changed_sentences) != 0:
                         if random.random() < 0.5:
                             candidate_changed_sentence = random.sample(candidate_changed_sentences, 1)[0]
@@ -104,7 +105,6 @@ for index, row in tqdm(data.iterrows(), total=len(data), desc='Preprocessing....
                                     start_end_index.append([start_index, start_index+len(tokenize_changed_sentence)])
                                     start_index = start_index + len(tokenize_changed_sentence)
                                     label_list.append(0)
-                        # consistent
                         else:
                             segment_sentence = clean_not_english_word(segment_sentence)
                             segment_sentence = clean_stopwords(segment_sentence)
@@ -115,7 +115,6 @@ for index, row in tqdm(data.iterrows(), total=len(data), desc='Preprocessing....
                                     start_end_index.append([start_index, start_index+len(tokenize_sentence)])
                                     start_index = start_index + len(tokenize_sentence)
                                     label_list.append(1)
-                    # consistent
                     elif len(candidate_no_changed_sentence) != 0:
                         candidate_no_changed_sentence = candidate_no_changed_sentence[0]
                         candidate_no_changed_sentence = clean_not_english_word(candidate_no_changed_sentence)
@@ -127,8 +126,8 @@ for index, row in tqdm(data.iterrows(), total=len(data), desc='Preprocessing....
                                 start_end_index.append([start_index, start_index+len(tokenize_no_changed_sentence)])
                                 start_index = start_index + len(tokenize_no_changed_sentence)
                                 label_list.append(1)
-                    # irrelevant
                     else:
+                        # irrelevant
                         segment_sentence = clean_not_english_word(segment_sentence)
                         segment_sentence = clean_stopwords(segment_sentence)
                         tokenize_sentence = tokenizer.encode(segment_sentence, add_special_tokens=False)
@@ -164,7 +163,7 @@ for index, row in tqdm(data.iterrows(), total=len(data), desc='Preprocessing....
     else:
         pass
 
-train_article, test_article, train_wiki_data, test_wiki_data, train_start_end_index, test_start_end_index, train_wiki_length, test_wiki_length, train_label, test_label = train_test_split(all_article_list, all_article_wikidata_text, all_start_end_index, all_article_wikidata_text_length, all_label_list, train_size=0.8,random_state=66)
+train_article, test_article, train_wiki_data, test_wiki_data, train_start_end_index, test_start_end_index, train_wiki_length, test_wiki_length, train_label, test_label = train_test_split(all_article_list, all_article_wikidata_text, all_start_end_index, all_article_wikidata_text_length, all_label_list, train_size=0.8,random_state=42)
 
 train_article.append(torch.zeros(seq_len, device=device))
 test_article.append(torch.zeros(seq_len, device=device))
@@ -172,10 +171,8 @@ test_article.append(torch.zeros(seq_len, device=device))
 train_article = pad_sequence(train_article, batch_first=True)[:-1]
 test_article = pad_sequence(test_article, batch_first=True)[:-1]
 
-
 config = {'hidden_size':768}
 
-# handle imbalance data
 train_label_0 = 0
 train_label_1 = 0
 train_label_2 = 0
@@ -194,9 +191,9 @@ cr = CrossReformer(config).cuda()
 optimizer = optim.Adam(cr.parameters(), lr=5e-5, eps=1e-8)
 CE = nn.CrossEntropyLoss(weight=class_weight)
 
-# training
+
 epochs = 40
-for epoch in tqdm(range(epochs), desc='Training....'):
+for epoch in tqdm(range(epochs), desc='Training...'):
     CE_mean_loss = []
     train_predict_result = []
     train_true_label = []
@@ -228,19 +225,17 @@ for epoch in tqdm(range(epochs), desc='Training....'):
     
     if epoch == epochs - 1:
         model_save_path = '/home/champion/wiki/cr'
-        save_model_name = 'cr_medicine.pickle'.format(epoch)
+        save_model_name = 'cr_biology.pickle'.format(epoch)
         if not os.path.isdir(model_save_path):
             os.mkdir(model_save_path)
         model_structure_path = os.path.join(model_save_path, save_model_name)
         torch.save(cr.state_dict(), model_structure_path)
 
-# evaluate on test dataset
-model_path = '/home/champion/wiki/cr/cr_medicine.pickle'
+
 cr = CrossReformer(config).cuda()
-pretrain_weight = torch.load(model_path, map_location=device)
+pretrain_weight = torch.load('/home/champion/wiki/cr/cr_biology.pickle', map_location=device)
 cr.load_state_dict(pretrain_weight)
 
-observe_test_predict_result = []
 test_predict_result = []
 test_predict_prob = []
 test_true_label = []
@@ -253,7 +248,6 @@ for article, wiki_datas, start_end_index, length, label in zip(test_article, tes
     test_pred_prob = torch.max(test_pred_prob, axis=1).values.cpu().detach().numpy()
     for result in test_pred_result:
         test_predict_result.append(result)
-    observe_test_predict_result.append(test_pred_result)
     for prob in test_pred_prob:
         test_predict_prob.append(prob)
     for i in label.cpu().detach().numpy():
